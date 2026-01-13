@@ -70,6 +70,7 @@ const genderTypes = [
 
 const ProductManagement = () => {
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -118,6 +119,218 @@ const ProductManagement = () => {
   const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
   const [imagePreview, setImagePreview] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
+  // Filtering state
+  const [filters, setFilters] = useState({
+    search: '',
+    category: 'all',
+    serviceType: 'all',
+    gender: 'all',
+    status: 'all',
+    minPrice: '',
+    maxPrice: '',
+    stockLevel: 'all'
+  });
+  
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState({
+    key: 'name',
+    direction: 'ascending'
+  });
+
+  // Calculate pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    
+    if (totalPages <= maxPagesToShow) {
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i);
+      }
+    } else {
+      let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+      let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+      
+      if (endPage - startPage + 1 < maxPagesToShow) {
+        startPage = Math.max(1, endPage - maxPagesToShow + 1);
+      }
+      
+      for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i);
+      }
+    }
+    
+    return pageNumbers;
+  };
+
+  // Filter products based on filters
+  const applyFilters = () => {
+    let result = [...products];
+    
+    // Apply search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      result = result.filter(product => 
+        product.name.toLowerCase().includes(searchLower) ||
+        product.description?.toLowerCase().includes(searchLower) ||
+        product.sku.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Apply category filter
+    if (filters.category !== 'all') {
+      result = result.filter(product => product.category === filters.category);
+    }
+    
+    // Apply service type filter
+    if (filters.serviceType !== 'all') {
+      result = result.filter(product => product.serviceType === filters.serviceType);
+    }
+    
+    // Apply gender filter
+    if (filters.gender !== 'all') {
+      result = result.filter(product => product.gender === filters.gender);
+    }
+    
+    // Apply status filter
+    if (filters.status !== 'all') {
+      result = result.filter(product => product.status === filters.status);
+    }
+    
+    // Apply price range filter
+    if (filters.minPrice) {
+      result = result.filter(product => product.price >= parseFloat(filters.minPrice));
+    }
+    
+    if (filters.maxPrice) {
+      result = result.filter(product => product.price <= parseFloat(filters.maxPrice));
+    }
+    
+    // Apply stock level filter
+    if (filters.stockLevel !== 'all') {
+      switch(filters.stockLevel) {
+        case 'high':
+          result = result.filter(product => product.stock / product.maxStock >= 0.7);
+          break;
+        case 'medium':
+          result = result.filter(product => 
+            product.stock / product.maxStock >= 0.3 && 
+            product.stock / product.maxStock < 0.7
+          );
+          break;
+        case 'low':
+          result = result.filter(product => 
+            product.stock / product.maxStock > 0 && 
+            product.stock / product.maxStock < 0.3
+          );
+          break;
+        case 'out':
+          result = result.filter(product => product.stock === 0);
+          break;
+      }
+    }
+    
+    return result;
+  };
+
+  // Sort products
+  const sortProducts = (productsToSort) => {
+    if (!sortConfig.key) return productsToSort;
+    
+    return [...productsToSort].sort((a, b) => {
+      let aValue = a[sortConfig.key];
+      let bValue = b[sortConfig.key];
+      
+      // Handle nested properties
+      if (sortConfig.key === 'category') {
+        aValue = getCategoryText(a.category);
+        bValue = getCategoryText(b.category);
+      } else if (sortConfig.key === 'status') {
+        aValue = getStatusText(a.status);
+        bValue = getStatusText(b.status);
+      }
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === 'ascending' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'ascending' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+
+  // Handle sort
+  const handleSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Handle filter change
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      category: 'all',
+      serviceType: 'all',
+      gender: 'all',
+      status: 'all',
+      minPrice: '',
+      maxPrice: '',
+      stockLevel: 'all'
+    });
+    setCurrentPage(1);
+  };
+
+  // Export filtered products
+  const exportToCSV = () => {
+    const headers = ['Name', 'Category', 'Service Type', 'Gender', 'SKU', 'Price', 'Stock', 'Status'];
+    const csvData = filteredProducts.map(product => [
+      product.name,
+      getCategoryText(product.category),
+      serviceTypes.find(st => st.value === product.serviceType)?.label || product.serviceType,
+      genderTypes.find(gt => gt.value === product.gender)?.label || product.gender,
+      product.sku,
+      `$${product.price?.toFixed(2)}`,
+      `${product.stock}/${product.maxStock}`,
+      getStatusText(product.status)
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `products_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   const fetchProducts = async () => {
     try {
@@ -140,6 +353,13 @@ const ProductManagement = () => {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  // Update filtered products when products or filters change
+  useEffect(() => {
+    const filtered = applyFilters();
+    const sorted = sortProducts(filtered);
+    setFilteredProducts(sorted);
+  }, [products, filters, sortConfig]);
 
   // Handle image upload
   const handleImageUpload = async (file) => {
@@ -250,6 +470,7 @@ const ProductManagement = () => {
   const lowStockCount = products.filter(p => p.status === 'low').length;
   const outOfStockCount = products.filter(p => p.status === 'out').length;
   const categoriesCount = new Set(products.map(p => p.category)).size;
+  const filteredCount = filteredProducts.length;
 
   // Handle form input changes
   const handleInputChange = (e, isEdit = false) => {
@@ -399,162 +620,163 @@ const ProductManagement = () => {
     }
   };
 
-// Fix the handleAddProduct function
-const handleAddProduct = async () => {
-  try {
-    // Validate required fields
-    if (!newProduct.name || !newProduct.type || !newProduct.category || !newProduct.serviceType || !newProduct.gender || !newProduct.sku || !newProduct.price || !newProduct.stock || !newProduct.maxStock) {
-      alert('Please fill in all required fields');
-      return;
-    }
+  // Handle add product
+  const handleAddProduct = async () => {
+    try {
+      // Validate required fields
+      if (!newProduct.name || !newProduct.type || !newProduct.category || !newProduct.serviceType || !newProduct.gender || !newProduct.sku || !newProduct.price || !newProduct.stock || !newProduct.maxStock) {
+        alert('Please fill in all required fields');
+        return;
+      }
 
-    // Prepare the product data with proper array filtering
-    const product = {
-      ...newProduct,
-      price: parseFloat(newProduct.price),
-      stock: parseInt(newProduct.stock),
-      maxStock: parseInt(newProduct.maxStock),
-      oldPrice: newProduct.oldPrice ? parseFloat(newProduct.oldPrice) : null,
-      discount: newProduct.discount ? parseInt(newProduct.discount) : null,
-      rating: newProduct.rating ? parseFloat(newProduct.rating) : 4.8,
+      // Prepare the product data with proper array filtering
+      const product = {
+        ...newProduct,
+        price: parseFloat(newProduct.price),
+        stock: parseInt(newProduct.stock),
+        maxStock: parseInt(newProduct.maxStock),
+        oldPrice: newProduct.oldPrice ? parseFloat(newProduct.oldPrice) : null,
+        discount: newProduct.discount ? parseInt(newProduct.discount) : null,
+        rating: newProduct.rating ? parseFloat(newProduct.rating) : 4.8,
+        
+        // Fix: Only send non-empty array items
+        overview: newProduct.overview.filter(item => item && item.trim() !== ''),
+        thingsToKnow: newProduct.thingsToKnow.filter(item => item && item.trim() !== ''),
+        precautions: newProduct.precautions.filter(item => item && item.trim() !== ''),
+        faqs: newProduct.faqs.filter(faq => 
+          faq.question && faq.question.trim() !== '' && 
+          faq.answer && faq.answer.trim() !== ''
+        ),
+        procedure: newProduct.procedure.filter(step => 
+          (step.title && step.title.trim() !== '') || 
+          (step.desc && step.desc.trim() !== '')
+        )
+      };
       
-      // Fix: Only send non-empty array items
-      overview: newProduct.overview.filter(item => item && item.trim() !== ''),
-      thingsToKnow: newProduct.thingsToKnow.filter(item => item && item.trim() !== ''),
-      precautions: newProduct.precautions.filter(item => item && item.trim() !== ''),
-      faqs: newProduct.faqs.filter(faq => 
-        faq.question && faq.question.trim() !== '' && 
-        faq.answer && faq.answer.trim() !== ''
-      ),
-      procedure: newProduct.procedure.filter(step => 
-        (step.title && step.title.trim() !== '') || 
-        (step.desc && step.desc.trim() !== '')
-      )
-    };
-    
-    console.log('Sending product data:', product);
-    
-    const response = await fetch(`${API_BASE_URL}/products`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(product),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to add product');
-    }
-    
-    await fetchProducts();
-    setShowAddModal(false);
-    
-    // Reset form
-    setNewProduct({
-      name: '',
-      description: '',
-      type: "",
-      category: "",
-      subCategory: "",
-      serviceType: "",
-      gender: "",
-      sku: '',
-      price: '',
-      stock: '',
-      maxStock: '',
-      overview: ['', '', '', ''],
-      thingsToKnow: ['', '', '', '', ''],
-      procedure: [
-        { title: '', desc: '', img: '' },
-        { title: '', desc: '', img: '' },
-        { title: '', desc: '', img: '' },
-        { title: '', desc: '', img: '' }
-      ],
-      precautions: ['', '', '', '', ''],
-      faqs: [
-        { question: '', answer: '' },
-        { question: '', answer: '' },
-        { question: '', answer: '' }
-      ],
-      image: '',
-      oldPrice: '',
-      discount: '',
-      rating: '4.8',
-      time: '60 mins',
-      tag: ''
-    });
-    setImagePreview('');
-  } catch (err) {
-    setError(err.message);
-    console.error('Error adding product:', err);
-    alert(`Error: ${err.message}`);
-  }
-};
-// Fix the handleEditProduct function
-const handleEditProduct = async () => {
-  try {
-    if (!editingProduct.name || !editingProduct.type || !editingProduct.category || !editingProduct.serviceType || !editingProduct.gender || !editingProduct.sku || !editingProduct.price || !editingProduct.stock || !editingProduct.maxStock) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    const updatedProduct = {
-      ...editingProduct,
-      price: parseFloat(editingProduct.price),
-      stock: parseInt(editingProduct.stock),
-      maxStock: parseInt(editingProduct.maxStock),
-      oldPrice: editingProduct.oldPrice ? parseFloat(editingProduct.oldPrice) : null,
-      discount: editingProduct.discount ? parseInt(editingProduct.discount) : null,
-      rating: editingProduct.rating ? parseFloat(editingProduct.rating) : 4.8,
+      console.log('Sending product data:', product);
       
-      // Fix: Ensure arrays are properly filtered
-      overview: Array.isArray(editingProduct.overview) ? 
-        editingProduct.overview.filter(item => item && typeof item === 'string' && item.trim() !== '') : [],
-      thingsToKnow: Array.isArray(editingProduct.thingsToKnow) ? 
-        editingProduct.thingsToKnow.filter(item => item && typeof item === 'string' && item.trim() !== '') : [],
-      precautions: Array.isArray(editingProduct.precautions) ? 
-        editingProduct.precautions.filter(item => item && typeof item === 'string' && item.trim() !== '') : [],
-      faqs: Array.isArray(editingProduct.faqs) ? 
-        editingProduct.faqs.filter(faq => 
-          faq && typeof faq === 'object' &&
-          faq.question && typeof faq.question === 'string' && faq.question.trim() !== '' &&
-          faq.answer && typeof faq.answer === 'string' && faq.answer.trim() !== ''
-        ) : [],
-      procedure: Array.isArray(editingProduct.procedure) ? 
-        editingProduct.procedure.filter(step => 
-          step && typeof step === 'object' &&
-          (
-            (step.title && typeof step.title === 'string' && step.title.trim() !== '') ||
-            (step.desc && typeof step.desc === 'string' && step.desc.trim() !== '')
-          )
-        ) : []
-    };
-
-    console.log('Updating product with:', updatedProduct);
-    
-    const response = await fetch(`${API_BASE_URL}/products/${editingProduct._id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(updatedProduct),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to update product');
+      const response = await fetch(`${API_BASE_URL}/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(product),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to add product');
+      }
+      
+      await fetchProducts();
+      setShowAddModal(false);
+      
+      // Reset form
+      setNewProduct({
+        name: '',
+        description: '',
+        type: "",
+        category: "",
+        subCategory: "",
+        serviceType: "",
+        gender: "",
+        sku: '',
+        price: '',
+        stock: '',
+        maxStock: '',
+        overview: ['', '', '', ''],
+        thingsToKnow: ['', '', '', '', ''],
+        procedure: [
+          { title: '', desc: '', img: '' },
+          { title: '', desc: '', img: '' },
+          { title: '', desc: '', img: '' },
+          { title: '', desc: '', img: '' }
+        ],
+        precautions: ['', '', '', '', ''],
+        faqs: [
+          { question: '', answer: '' },
+          { question: '', answer: '' },
+          { question: '', answer: '' }
+        ],
+        image: '',
+        oldPrice: '',
+        discount: '',
+        rating: '4.8',
+        time: '60 mins',
+        tag: ''
+      });
+      setImagePreview('');
+    } catch (err) {
+      setError(err.message);
+      console.error('Error adding product:', err);
+      alert(`Error: ${err.message}`);
     }
-    
-    await fetchProducts();
-    setShowEditModal(false);
-    setEditingProduct(null);
-  } catch (err) {
-    setError(err.message);
-    console.error('Error updating product:', err);
-    alert(`Error: ${err.message}`);
-  }
-};
+  };
+
+  // Handle edit product
+  const handleEditProduct = async () => {
+    try {
+      if (!editingProduct.name || !editingProduct.type || !editingProduct.category || !editingProduct.serviceType || !editingProduct.gender || !editingProduct.sku || !editingProduct.price || !editingProduct.stock || !editingProduct.maxStock) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      const updatedProduct = {
+        ...editingProduct,
+        price: parseFloat(editingProduct.price),
+        stock: parseInt(editingProduct.stock),
+        maxStock: parseInt(editingProduct.maxStock),
+        oldPrice: editingProduct.oldPrice ? parseFloat(editingProduct.oldPrice) : null,
+        discount: editingProduct.discount ? parseInt(editingProduct.discount) : null,
+        rating: editingProduct.rating ? parseFloat(editingProduct.rating) : 4.8,
+        
+        // Fix: Ensure arrays are properly filtered
+        overview: Array.isArray(editingProduct.overview) ? 
+          editingProduct.overview.filter(item => item && typeof item === 'string' && item.trim() !== '') : [],
+        thingsToKnow: Array.isArray(editingProduct.thingsToKnow) ? 
+          editingProduct.thingsToKnow.filter(item => item && typeof item === 'string' && item.trim() !== '') : [],
+        precautions: Array.isArray(editingProduct.precautions) ? 
+          editingProduct.precautions.filter(item => item && typeof item === 'string' && item.trim() !== '') : [],
+        faqs: Array.isArray(editingProduct.faqs) ? 
+          editingProduct.faqs.filter(faq => 
+            faq && typeof faq === 'object' &&
+            faq.question && typeof faq.question === 'string' && faq.question.trim() !== '' &&
+            faq.answer && typeof faq.answer === 'string' && faq.answer.trim() !== ''
+          ) : [],
+        procedure: Array.isArray(editingProduct.procedure) ? 
+          editingProduct.procedure.filter(step => 
+            step && typeof step === 'object' &&
+            (
+              (step.title && typeof step.title === 'string' && step.title.trim() !== '') ||
+              (step.desc && typeof step.desc === 'string' && step.desc.trim() !== '')
+            )
+          ) : []
+      };
+
+      console.log('Updating product with:', updatedProduct);
+      
+      const response = await fetch(`${API_BASE_URL}/products/${editingProduct._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedProduct),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update product');
+      }
+      
+      await fetchProducts();
+      setShowEditModal(false);
+      setEditingProduct(null);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error updating product:', err);
+      alert(`Error: ${err.message}`);
+    }
+  };
 
   // Delete a product
   const handleDeleteProduct = async (id) => {
@@ -622,6 +844,13 @@ const handleEditProduct = async () => {
 
   // Category text
   const getCategoryText = (category) => {
+    // First check if it matches any category from our categories object
+    for (const type in categories) {
+      const catObj = categories[type].categories.find(cat => cat.id === category);
+      if (catObj) return catObj.name;
+    }
+    
+    // Fallback to generic mapping
     switch(category) {
       case 'cleaning': return 'Cleaning Supplies';
       case 'beauty': return 'Beauty Products';
@@ -790,6 +1019,50 @@ const handleEditProduct = async () => {
             content: " *";
             color: #dc3545;
           }
+
+          /* Add new styles for filtering */
+          .filter-section {
+            background: #f8f9fa;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+          }
+          
+          .filter-header {
+            cursor: pointer;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #dee2e6;
+          }
+          
+          .filter-body {
+            padding: 1rem 0;
+          }
+          
+          .sortable-header {
+            cursor: pointer;
+            user-select: none;
+          }
+          
+          .sortable-header:hover {
+            background-color: #f8f9fa;
+          }
+          
+          .sort-indicator {
+            margin-left: 0.5rem;
+            font-size: 0.75rem;
+          }
+          
+          .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+          }
+          
+          .items-per-page-select {
+            width: auto;
+            display: inline-block;
+          }
         `}
       </style>
       
@@ -818,10 +1091,10 @@ const handleEditProduct = async () => {
           <div className="col-md-3">
             <div className="card">
               <div className="card-body text-center">
-                <h5 className="card-title text-muted">Low Stock</h5>
-                <h2 className="text-warning">{lowStockCount}</h2>
-                <p className="card-text text-danger">
-                  <i className="bi bi-exclamation-triangle"></i> Needs attention
+                <h5 className="card-title text-muted">Filtered</h5>
+                <h2 className="text-info">{filteredCount}</h2>
+                <p className="card-text">
+                  {filteredCount === totalProducts ? 'No filters applied' : `${filteredCount} of ${totalProducts}`}
                 </p>
               </div>
             </div>
@@ -829,10 +1102,10 @@ const handleEditProduct = async () => {
           <div className="col-md-3">
             <div className="card">
               <div className="card-body text-center">
-                <h5 className="card-title text-muted">Out of Stock</h5>
-                <h2 className="text-danger">{outOfStockCount}</h2>
-                <p className="card-text">
-                  <i className="bi bi-clock"></i> Restock pending
+                <h5 className="card-title text-muted">Low Stock</h5>
+                <h2 className="text-warning">{lowStockCount}</h2>
+                <p className="card-text text-danger">
+                  <i className="bi bi-exclamation-triangle"></i> Needs attention
                 </p>
               </div>
             </div>
@@ -850,30 +1123,206 @@ const handleEditProduct = async () => {
           </div>
         </div>
 
+        {/* Filtering Section */}
+        <div className="card mt-4">
+          <div className="card-header">
+            <h5 className="mb-0">Filters</h5>
+          </div>
+          <div className="card-body">
+            <div className="row g-3">
+              <div className="col-md-3">
+                <label htmlFor="search" className="form-label">Search</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  id="search"
+                  name="search"
+                  placeholder="Search by name, SKU, description..."
+                  value={filters.search}
+                  onChange={handleFilterChange}
+                />
+              </div>
+              
+              <div className="col-md-2">
+                <label htmlFor="category" className="form-label">Category</label>
+                <select
+                  className="form-select"
+                  id="category"
+                  name="category"
+                  value={filters.category}
+                  onChange={handleFilterChange}
+                >
+                  <option value="all">All Categories</option>
+                  {Object.keys(categories).flatMap(type =>
+                    categories[type].categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))
+                  )}
+                </select>
+              </div>
+              
+              <div className="col-md-2">
+                <label htmlFor="serviceType" className="form-label">Service Type</label>
+                <select
+                  className="form-select"
+                  id="serviceType"
+                  name="serviceType"
+                  value={filters.serviceType}
+                  onChange={handleFilterChange}
+                >
+                  <option value="all">All Service Types</option>
+                  {serviceTypes.map(st => (
+                    <option key={st.value} value={st.value}>{st.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="col-md-2">
+                <label htmlFor="status" className="form-label">Status</label>
+                <select
+                  className="form-select"
+                  id="status"
+                  name="status"
+                  value={filters.status}
+                  onChange={handleFilterChange}
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">In Stock</option>
+                  <option value="low">Low Stock</option>
+                  <option value="out">Out of Stock</option>
+                </select>
+              </div>
+              
+              <div className="col-md-2">
+                <label htmlFor="stockLevel" className="form-label">Stock Level</label>
+                <select
+                  className="form-select"
+                  id="stockLevel"
+                  name="stockLevel"
+                  value={filters.stockLevel}
+                  onChange={handleFilterChange}
+                >
+                  <option value="all">All Levels</option>
+                  <option value="high">High (&gt;70%)</option>
+                  <option value="medium">Medium (30-70%)</option>
+                  <option value="low">Low (&lt;30%)</option>
+                  <option value="out">Out of Stock</option>
+                </select>
+              </div>
+              
+              <div className="col-md-6">
+                <div className="row g-2">
+                  <div className="col-md-6">
+                    <label htmlFor="minPrice" className="form-label">Min Price ($)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      id="minPrice"
+                      name="minPrice"
+                      placeholder="Min"
+                      value={filters.minPrice}
+                      onChange={handleFilterChange}
+                      min="0"
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label htmlFor="maxPrice" className="form-label">Max Price ($)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      id="maxPrice"
+                      name="maxPrice"
+                      placeholder="Max"
+                      value={filters.maxPrice}
+                      onChange={handleFilterChange}
+                      min="0"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="col-md-12">
+                <div className="d-flex justify-content-end gap-2">
+                  <button 
+                    className="btn btn-outline-secondary" 
+                    onClick={clearFilters}
+                  >
+                    <i className="bi bi-x-circle me-1"></i>Clear Filters
+                  </button>
+                  <button 
+                    className="btn btn-outline-primary"
+                    onClick={() => {
+                      // Advanced filters toggle can be implemented here
+                    }}
+                  >
+                    <i className="bi bi-funnel me-1"></i>Advanced
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Products Table */}
         <div className="card mt-4">
           <div className="card-header d-flex justify-content-between align-items-center">
-            <span>All Products</span>
+            <span>Products ({filteredCount} items)</span>
             <div>
-              <button className="btn btn-sm btn-outline-secondary me-2">
-                <i className="bi bi-filter me-1"></i>Filter
-              </button>
-              <button className="btn btn-sm btn-outline-secondary">
+              <div className="btn-group me-2">
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => setItemsPerPage(10)}
+                >
+                  10
+                </button>
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => setItemsPerPage(25)}
+                >
+                  25
+                </button>
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => setItemsPerPage(50)}
+                >
+                  50
+                </button>
+                <button 
+                  className="btn btn-sm btn-outline-secondary"
+                  onClick={() => setItemsPerPage(100)}
+                >
+                  100
+                </button>
+              </div>
+              <button 
+                className="btn btn-sm btn-outline-success me-2" 
+                onClick={exportToCSV}
+              >
                 <i className="bi bi-download me-1"></i>Export
               </button>
             </div>
           </div>
           <div className="card-body">
-            {products.length === 0 ? (
+            {filteredProducts.length === 0 ? (
               <div className="no-products">
                 <i className="bi bi-inbox"></i>
-                <h4>No Products Available</h4>
-                <p>Get started by adding your first product to the inventory.</p>
+                <h4>No Products Found</h4>
+                <p>{products.length === 0 ? 'No products available.' : 'No products match your filters.'}</p>
+                {products.length > 0 && filters.search && (
+                  <p className="text-muted">Try adjusting your search or filters.</p>
+                )}
                 <button 
                   className="btn btn-primary mt-3"
-                  onClick={() => setShowAddModal(true)}
+                  onClick={() => {
+                    if (products.length === 0) {
+                      setShowAddModal(true);
+                    } else {
+                      clearFilters();
+                    }
+                  }}
                 >
-                  <i className="bi bi-plus-circle me-2"></i>Add New Product
+                  <i className="bi bi-plus-circle me-2"></i>
+                  {products.length === 0 ? 'Add New Product' : 'Clear Filters'}
                 </button>
               </div>
             ) : (
@@ -884,22 +1333,90 @@ const handleEditProduct = async () => {
                       <tr>
                         <th>
                           <div className="form-check">
-                            <input className="form-check-input" type="checkbox" value=""/>
+                            <input 
+                              className="form-check-input" 
+                              type="checkbox" 
+                              onChange={(e) => {
+                                // Select all checkboxes
+                                const checkboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+                                checkboxes.forEach(cb => cb.checked = e.target.checked);
+                              }}
+                            />
                           </div>
                         </th>
-                        <th>Product Name</th>
-                        <th>Category</th>
+                        <th 
+                          className="sortable-header"
+                          onClick={() => handleSort('name')}
+                        >
+                          Product Name
+                          {sortConfig.key === 'name' && (
+                            <span className="sort-indicator">
+                              {sortConfig.direction === 'ascending' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </th>
+                        <th 
+                          className="sortable-header"
+                          onClick={() => handleSort('category')}
+                        >
+                          Category
+                          {sortConfig.key === 'category' && (
+                            <span className="sort-indicator">
+                              {sortConfig.direction === 'ascending' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </th>
                         <th>Service Type</th>
                         <th>Gender</th>
-                        <th>SKU</th>
-                        <th>Price</th>
-                        <th>Inventory</th>
-                        <th>Status</th>
+                        <th 
+                          className="sortable-header"
+                          onClick={() => handleSort('sku')}
+                        >
+                          SKU
+                          {sortConfig.key === 'sku' && (
+                            <span className="sort-indicator">
+                              {sortConfig.direction === 'ascending' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </th>
+                        <th 
+                          className="sortable-header"
+                          onClick={() => handleSort('price')}
+                        >
+                          Price
+                          {sortConfig.key === 'price' && (
+                            <span className="sort-indicator">
+                              {sortConfig.direction === 'ascending' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </th>
+                        <th 
+                          className="sortable-header"
+                          onClick={() => handleSort('stock')}
+                        >
+                          Inventory
+                          {sortConfig.key === 'stock' && (
+                            <span className="sort-indicator">
+                              {sortConfig.direction === 'ascending' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </th>
+                        <th 
+                          className="sortable-header"
+                          onClick={() => handleSort('status')}
+                        >
+                          Status
+                          {sortConfig.key === 'status' && (
+                            <span className="sort-indicator">
+                              {sortConfig.direction === 'ascending' ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {products.map(product => (
+                      {currentItems.map(product => (
                         <tr key={product._id}>
                           <td>
                             <div className="form-check">
@@ -983,19 +1500,87 @@ const handleEditProduct = async () => {
                 </div>
                 
                 {/* Pagination */}
-                <nav aria-label="Page navigation">
-                  <ul className="pagination justify-content-center">
-                    <li className="page-item disabled">
-                      <a className="page-link" href="#" tabIndex="-1">Previous</a>
-                    </li>
-                    <li className="page-item active"><a className="page-link" href="#">1</a></li>
-                    <li className="page-item"><a className="page-link" href="#">2</a></li>
-                    <li className="page-item"><a className="page-link" href="#">3</a></li>
-                    <li className="page-item">
-                      <a className="page-link" href="#">Next</a>
-                    </li>
-                  </ul>
-                </nav>
+                <div className="pagination-container">
+                  <div>
+                    <span className="text-muted">
+                      Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredProducts.length)} of {filteredProducts.length} entries
+                    </span>
+                  </div>
+                  
+                  <nav aria-label="Page navigation">
+                    <ul className="pagination justify-content-center mb-0">
+                      <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                        <button 
+                          className="page-link" 
+                          onClick={() => setCurrentPage(1)}
+                          disabled={currentPage === 1}
+                        >
+                          <i className="bi bi-chevron-double-left"></i>
+                        </button>
+                      </li>
+                      <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                        <button 
+                          className="page-link" 
+                          onClick={() => setCurrentPage(currentPage - 1)}
+                          disabled={currentPage === 1}
+                        >
+                          <i className="bi bi-chevron-left"></i>
+                        </button>
+                      </li>
+                      
+                      {getPageNumbers().map(number => (
+                        <li 
+                          key={number} 
+                          className={`page-item ${currentPage === number ? 'active' : ''}`}
+                        >
+                          <button 
+                            className="page-link" 
+                            onClick={() => setCurrentPage(number)}
+                          >
+                            {number}
+                          </button>
+                        </li>
+                      ))}
+                      
+                      <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                        <button 
+                          className="page-link" 
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                        >
+                          <i className="bi bi-chevron-right"></i>
+                        </button>
+                      </li>
+                      <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                        <button 
+                          className="page-link" 
+                          onClick={() => setCurrentPage(totalPages)}
+                          disabled={currentPage === totalPages}
+                        >
+                          <i className="bi bi-chevron-double-right"></i>
+                        </button>
+                      </li>
+                    </ul>
+                  </nav>
+                  
+                  <div className="d-flex align-items-center">
+                    <span className="me-2">Items per page:</span>
+                    <select 
+                      className="form-select form-select-sm items-per-page-select"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(parseInt(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="25">25</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                    </select>
+                  </div>
+                </div>
               </>
             )}
           </div>
@@ -1912,8 +2497,8 @@ const handleEditProduct = async () => {
                   <hr className="my-4" />
                   <h6 className="mb-3">Product Details</h6>
                   
-                  {/* The rest of the edit form sections (overview, thingsToKnow, procedure, precautions, faqs) */}
-                  {/* These would be similar to the add modal but using editingProduct state */}
+                  {/* The rest of the edit form sections would be here */}
+                  {/* They are similar to the add modal but using editingProduct state */}
                   
                 </form>
               </div>

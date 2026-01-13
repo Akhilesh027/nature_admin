@@ -10,6 +10,7 @@ import ProductManagement from './components/ProductManagement.jsx';
 import ServiceManagement from './components/ServiceManagement.jsx';
 import AdminBannerManager from './components/Banner.jsx';
 import Course from './components/Course.jsx';
+import EnrollmentManagement from './components/Enrolement.jsx';
 
 function App() {
   const [sidebarActive, setSidebarActive] = useState(false);
@@ -38,6 +39,7 @@ function App() {
 {activeSection === 'product-management' && <ProductManagement />}
 {activeSection === 'service-management' && <ServiceManagement />}
 {activeSection === 'Course-management' && <Course />}
+{activeSection === 'Enrollement-management' && <EnrollmentManagement />}
 {activeSection === 'Banner' && <AdminBannerManager />}
         {/* Other sections would be conditionally rendered here */}
       </div>

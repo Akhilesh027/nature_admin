@@ -42,7 +42,7 @@ const UserManagement = () => {
     const mappedStaff = staff.map((s) => ({
       ...s,
       source: "staff",
-      role: "Service Provider",
+      role: "Service vendor",
     }));
     return [...mappedUsers, ...mappedStaff];
   }, [users, staff]);
@@ -91,7 +91,7 @@ const UserManagement = () => {
             } font-semibold`}
             onClick={() => setActiveTab("providers")}
           >
-            Service Providers
+            Service vendors
           </button>
         </nav>
       </div>
@@ -113,7 +113,7 @@ const UserManagement = () => {
           <tbody>
             {filteredUsers.map((user) => (
               <tr key={user._id || user.id} className="hover:bg-gray-50">
-                <td className="border border-gray-300 p-2">{user.name}</td>
+                <td className="border border-gray-300 p-2">{user.firstName}  {user.name}</td>
                 <td className="border border-gray-300 p-2">{user.email}</td>
                 <td className="border border-gray-300 p-2">{user.role}</td>
                 {/* Add more columns as needed */}

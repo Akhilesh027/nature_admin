@@ -9,6 +9,7 @@ const Sidebar = ({ active, activeSection, changeSection }) => {
     { id: 'booking-management', label: 'Booking Management', icon: 'bi-calendar-event' },
     { id: 'product-management', label: 'Service Management', icon: 'bi-cart' },
     { id: 'Course-management', label: 'Course Management', icon: 'bi-book' },
+    { id: 'Enrollement-management', label: 'Enrollment', icon: 'bi-book' },
     { id: 'Banner', label: 'Banner', icon: 'bi-file-earmark-text' },
     { id: 'finance-reports', label: 'Finance & Reports', icon: 'bi-graph-up' },
     { id: 'settings', label: 'Settings', icon: 'bi-gear' }

@@ -252,7 +252,7 @@ const BookingManagement = () => {
                 )}
                 
                 <div><b>Order Placed:</b> {new Date(selectedBooking.orderDate).toLocaleString()}</div>
-                <div><b>Total:</b> ${selectedBooking.amounts?.total.toFixed(2)}</div>
+                <div><b>Total:</b> ₹{selectedBooking.amounts?.total.toFixed(2)}</div>
                 <div><b>Payment Type:</b> {selectedBooking.paymentType}</div>
                 <div><b>Assigned Staff:</b> {selectedBooking.assignedStaff?.name || 'Not assigned'}</div>
             </div>
@@ -489,7 +489,7 @@ const BookingManagement = () => {
                                             {new Date(booking.orderDate).toLocaleDateString()} {new Date(booking.orderDate).toLocaleTimeString()}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            ${booking.amounts?.total.toFixed(2)}
+                                            ₹{booking.amounts?.total.toFixed(2)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">{statusBadge(booking.paymentType)}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
