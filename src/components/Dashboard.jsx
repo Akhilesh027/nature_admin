@@ -3,7 +3,7 @@ import MetricCard from "./MetricCard";
 import RevenueChart from "./RevenueChart";
 import ServiceDistributionChart from "./ServiceDistributionChart";
 
-const API = "http://localhost:5000/api/dashboard"; // change if deployed
+const API = "https://api.hellonature.in/api/dashboard"; // change if deployed
 
 const Dashboard = () => {
   const [metrics, setMetrics] = useState([]);
